@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Elingo - Smart Life Journal</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:600 1.15rem/1.5 sans-serif;background:var(--bg);color:var(--fg)}
+body[data-t=gelap]{--bg:#000;--fg:#fff;--bd:#FFD700}
+body[data-t=terang]{--bg:#fff;--fg:#000;--bd:#000}
+header,main,nav{padding:12px;max-width:640px;margin:auto}
+h1,h2{margin:8px 0}
+button{display:block;width:100%;min-height:70px;margin:8px 0;padding:8px;background:#FFD700;color:#000;border:4px solid var(--bd);font:900 1.2rem sans-serif;text-transform:uppercase;border-radius:12px}
+input,select,textarea{display:block;width:100%;min-height:64px;margin:6px 0;padding:8px;font:600 1.3rem sans-serif;background:var(--bg);color:var(--fg);border:3px solid var(--bd);border-radius:10px}
+textarea{min-height:180px}
+#out{margin:8px 12px;padding:12px;border:4px solid var(--bd);border-radius:12px;font-size:1.6rem;font-weight:900;min-height:80px}
+.card{border:3px solid var(--bd);border-radius:12px;padding:10px;margin:10px 0}
+label{display:block;font-weight:900;margin-top:10px}
+</style></head>
+<body data-t="gelap">
+<div id="lock" hidden><main><h1>ELINGO TERKUNCI</h1>
+<label for="pin">MASUKKAN PIN 4 ANGKA</label>
+<input id="pin" type="password" inputmode="numeric" maxlength="4" aria-label="Masukkan PIN 4 angka">
+<button aria-label="Buka aplikasi dengan PIN" onclick="bukaPin()">BUKA</button></main></div>
+<div id="app">
+<header><h1>ELINGO</h1><button aria-label="Ganti tema gelap atau terang" onclick="ganti()">GANTI TEMA</button></header>
+<div id="out" role="status" aria-live="polite">Selamat datang di Elingo.</div>
+<main><section id="s0"></section><section id="s1" hidden></section><section id="s2" hidden></section><section id="s3" hidden></section><section id="s4" hidden></section></main>
+<nav aria-label="Menu bawah" id="nav"></nav>
+</div>
+<script>
+const $=id=>document.getElementById(id),Q=s=>document.querySelectorAll(s);
+const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const N=['Beranda','Jurnal','Uang','Pengalaman','Pengaturan'],MOODS=['Senang','Biasa','Sedih','Marah','Capek'],KAT=['Makan','Transport','Pulsa','Jajan','Kesehatan','Gaji','Lainnya'];
+let D={j:[],u:[],p:[],s:{}},mood='Biasa',greeted=false;
+try{const x=JSON.parse(localStorage.getItem('lumina'));if(x&&x.j)D=x}catch(_){}
+const defS=()=>({target:0,tagihan:[],pin:'',tema:localStorage.getItem('lumina_tema')||'gelap'});
+D.s=Object.assign(defS(),D.s||{});
+const save=()=>{try{localStorage.setItem('lumina',JSON.stringify(D));localStorage.setItem('lumina_tema',D.s.tema)}catch(_){say('Penyimpanan gagal.')}};
+function say(t,cb){$('out').textContent=t;let d=false;const f=()=>{if(!d){d=true;cb&&cb()}};
+try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='id-ID';u.onend=f;u.onerror=f;speechSynthesis.speak(u);if(cb)setTimeout(f,5000)}catch(_){f()}}
+const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today=()=>ymd(new Date());
+const rp=n=>'Rp '+Number(n||0).toLocaleString('id-ID');
+const inW=d=>{const f=(new Date(today()+'T00:00')-new Date(d+'T00:00'))/864e5;return f>=0&&f<7};
+const btn=(l,f,a)=>`<button aria-label="${e(a||l)}" onclick="${f}">${e(l)}</button>`;
+const fld=(id,l,m,ta)=>`<label for="${id}">${l}</label>${ta?`<textarea id="${id}" aria-label="${l}"></textarea>`:`<input id="${id}" aria-label="${l}">`}${m?`<button aria-label="Isi dengan suara ${l}" onclick="mic('${id}','${l}',this)">ISI DENGAN SUARA ${l}</button>`:''}`;
+const sel=(id,l,o)=>`<label for="${id}">${l}</label><select id="${id}" aria-label="${l}">${o.map(x=>`<option>${x}</option>`).join('')}</select>`;
+function mic(id,name,b,after){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!SR)return say('Browser ini tidak mendukung suara, silakan ketik manual.');
+const old=b.textContent;b.textContent='MENDENGARKAN... SILAKAN BICARA';
+say('Mendengarkan, silakan bicara',()=>{try{const r=new SR();r.lang='id-ID';r.continuous=false;
+r.onresult=ev=>{const t=ev.results[0][0].transcript,el=$(id);el.value=(el.value&&!after?el.value+' ':'')+t;say(name+' terisi: '+t);(after||render)()};
+r.onerror=()=>say('Suara tidak terdengar, coba lagi.');r.onend=()=>{b.textContent=old};r.start()}catch(_){b.textContent=old;say('Suara gagal dimulai, silakan ketik manual.')}})}
+function tema(){document.body.dataset.t=D.s.tema}
+function ganti(){D.s.tema=D.s.tema=='gelap'?'terang':'gelap';tema();save();say('Tema diganti ke '+(D.s.tema=='gelap'?'Gelap':'Terang'))}
+function show(i,q){Q('section').forEach((s,k)=>s.hidden=k!=i);render();scrollTo(0,0);if(!q)say('Menu '+N[i])}
+function tags(t){const sw=new Set('yang dan atau dengan untuk dari pada saya aku tadi hari ini itu juga tapi karena sudah akan tidak bisa kami kita mereka ada lagi sangat banget udah mau jadi dalam seperti'.split(' ')),c={};
+(t.toLowerCase().match(/[a-z]{4,}/g)||[]).forEach(w=>{if(!sw.has(w))c[w]=(c[w]||0)+1});return Object.keys(c).sort((a,b)=>c[b]-c[a]).slice(0,3)}
+function tot(){const t=today(),m=t.slice(0,7);let h=0,w=0,b=0,i=0,o=0,bi=0;
+D.u.forEach(x=>{const n=+x.n||0;if(x.k=='Pemasukan'){i+=n;if(x.t.slice(0,7)==m)bi+=n}else{o+=n;if(x.t==t)h+=n;if(inW(x.t))w+=n;if(x.t.slice(0,7)==m)b+=n}});return{h,w,b,i,o,s:i-o,bi}}
+function tgt(){if(!D.s.target)return'Target tabungan belum diatur.';const t=tot(),s=Math.max(0,t.bi-t.b),p=Math.min(100,Math.round(s/D.s.target*100));return`Sudah terkumpul ${p} persen, tinggal ${rp(Math.max(0,D.s.target-s))} lagi.`}
+function tagih(){const d=new Date();d.setDate(d.getDate()+1);const r=D.s.tagihan.filter(x=>x.d==d.getDate()).map(x=>x.n);return r.length?'Peringatan: besok ada tagihan '+r.join(', ')+'.':''}
+function ms(){const c={};D.j.filter(x=>inW(x.t)).forEach(x=>c[x.m]=(c[x.m]||0)+1);const a=Object.keys(c).map(k=>`${c[k]} hari ${k}`);return a.length?'Minggu ini '+a.join(', ')+'.':'Minggu ini belum ada jurnal.'}
+function sum(){const t=tot(),m=D.j.filter(x=>x.t==today()).pop();return`Hari ini kamu mengeluarkan ${rp(t.h)}. Bulan ini ${rp(t.b)}. Mood hari ini: ${m?m.m:'belum ada'}. ${tagih()}`}
+function rB(){const t=tot(),m=D.j.filter(x=>x.t==today()).pop();
+$('bt').innerHTML=`<p>Tanggal: ${new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p><p>Pengeluaran hari ini: ${rp(t.h)}</p><p>Pengeluaran bulan ini: ${rp(t.b)}</p><p>Mood hari ini: ${m?m.m:'Belum ada'}</p><p>${e(sum())}</p>`}
+function sJ(){const j=$('jj').value.trim(),i=$('ji').value.trim();if(!j&&!i)return say('Judul dan isi masih kosong. Isi dulu.');
+D.j.push({id:Date.now(),t:today(),m:mood,j:j||'Tanpa judul',i,g:tags(j+' '+i)});save();$('jj').value=$('ji').value='';rJ();rB();say('Jurnal tersimpan. Mood '+mood+'.')}
+function setMood(m){mood=m;Q('.mb').forEach(b=>b.textContent=(b.dataset.m==mood?'DIPILIH: ':'')+b.dataset.m);say('Mood dipilih: '+m)}
+function rJ(){$('ms').textContent=ms();const q=($('jq').value||'').toLowerCase();
+$('jl').innerHTML=[...D.j].reverse().filter(x=>!q||(x.j+' '+x.i+' '+x.g.join(' ')).toLowerCase().includes(q)).map(x=>`<div class="card"><p>${x.t} - ${x.m} - ${e(x.j)}</p><p>Tag: ${e(x.g.join(', '))||'-'}</p>${btn('Baca detail','detJ('+x.id+')','Baca detail jurnal '+x.j)}${btn('Hapus','dJ('+x.id+')','Hapus jurnal '+x.j)}</div>`).join('')||'Belum ada jurnal.'}
+function detJ(id){const x=D.j.find(y=>y.id==id);if(x)say(`Jurnal tanggal ${x.t}. Mood ${x.m}. Judul ${x.j}. Isi: ${x.i}`)}
+function dJ(id){D.j=D.j.filter(x=>x.id!=id);save();rJ();rB();say('Jurnal dihapus.')}
+function sU(){const n=+$('un').value;if(!(n>0))return say('Nominal belum diisi. Isi angka saja.');
+D.u.push({id:Date.now(),t:today(),k:$('uj').value,n,c:$('uk').value,d:$('ud').value.trim()});save();const j=$('uj').value;$('un').value=$('ud').value='';rU();rB();say(`${j} ${rp(n)} tersimpan. `+tgt())}
+function sT(){const n=$('tn').value.trim(),d=+$('td').value;if(!n||!(d>=1&&d<=31))return say('Isi nama tagihan dan tanggal 1 sampai 31.');D.s.tagihan.push({n,d});save();$('tn').value=$('td').value='';rU();say(`Tagihan ${n} tiap tanggal ${d} tersimpan.`)}
+function rU(){const t=tot();
+$('ut').innerHTML=`<p>Total hari ini: ${rp(t.h)}</p><p>Total minggu ini: ${rp(t.w)}</p><p>Total bulan ini: ${rp(t.b)}</p><p>Total pemasukan: ${rp(t.i)}</p><p>Total pengeluaran: ${rp(t.o)}</p><p>Sisa uang: ${rp(t.s)}</p>`;
+$('tg').textContent=tgt();
+$('tl').innerHTML=D.s.tagihan.map((x,k)=>`<div class="card">Tagihan ${e(x.n)} tiap tanggal ${x.d}${btn('Hapus tagihan','dT('+k+')','Hapus tagihan '+x.n)}</div>`).join('')||'Belum ada tagihan.';
+const k=$('uf').value,m=$('um').value;
+$('ul').innerHTML=[...D.u].reverse().filter(x=>(k=='Semua'||x.c==k)&&(!m||x.t.slice(0,7)==m)).map(x=>`<div class="card">${x.t}: ${x.k} ${rp(x.n)}, ${x.c}. ${e(x.d)}${btn('Hapus','dU('+x.id+')','Hapus transaksi '+x.c+' '+rp(x.n))}</div>`).join('')||'Belum ada transaksi.'}
+function dU(id){D.u=D.u.filter(x=>x.id!=id);save();rU();rB();say('Transaksi dihapus.')}
+function dT(k){D.s.tagihan.splice(k,1);save();rU();say('Tagihan dihapus.')}
+function sP(){const j=$('pj').value.trim();if(!j)return say('Judul pengalaman masih kosong.');
+D.p.push({id:Date.now(),t:$('pt').value||today(),j,s:$('ps').value,d:$('pd').value,a:$('pa').value,l:$('pl').value,n:$('pn').value});save();['pj','ps','pd','pa','pl'].forEach(i=>$(i).value='');rP();say('Pengalaman tersimpan.')}
+function rP(){const q=($('pq').value||'').toLowerCase(),f=$('pf').value;
+$('pls').innerHTML=[...D.p].reverse().filter(x=>(f=='Semua'||x.n==f)&&(!q||[x.j,x.s,x.d,x.a,x.l].join(' ').toLowerCase().includes(q))).map(x=>`<div class="card"><p>${x.t} - ${e(x.j)} - ${x.n}</p>${btn('Baca detail','detP('+x.id+')','Baca detail pengalaman '+x.j)}${btn('Hapus','dP('+x.id+')','Hapus pengalaman '+x.j)}</div>`).join('')||'Belum ada pengalaman.'}
+function detP(id){const x=D.p.find(y=>y.id==id);if(x)say(`${x.j}. Tanggal ${x.t}. Siapa: ${x.s}. Dimana: ${x.d}. Yang terjadi: ${x.a}. Pelajaran: ${x.l}. Nilai: ${x.n}.`)}
+function dP(id){D.p=D.p.filter(x=>x.id!=id);save();rP();say('Pengalaman dihapus.')}
+function cari(){const q=$('gq').value.toLowerCase().trim();if(!q)return say('Kata pencarian masih kosong.');const r=[];
+D.j.forEach(x=>(x.j+' '+x.i+' '+x.g.join(' ')).toLowerCase().includes(q)&&r.push('Jurnal '+x.t+': '+x.j));
+D.u.forEach(x=>(x.c+' '+x.d).toLowerCase().includes(q)&&r.push('Uang '+x.t+': '+x.k+' '+rp(x.n)+' '+x.c+' '+x.d));
+D.p.forEach(x=>[x.j,x.s,x.d,x.a,x.l].join(' ').toLowerCase().includes(q)&&r.push('Pengalaman '+x.t+': '+x.j));
+$('hasil').innerHTML=r.map(s=>`<div class="card">${e(s)}</div>`).join('');
+say(r.length?`Ditemukan ${r.length} catatan. `+r.slice(0,3).join('. '):'Tidak ada catatan yang cocok.')}
+function ring(){const t=tot();say(`Ringkasan minggu ini: ${D.j.filter(x=>inW(x.t)).length} jurnal, pengeluaran ${rp(t.w)}, dan ${D.p.filter(x=>inW(x.t)).length} pengalaman baru.`)}
+function dl(n,s,ty){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type:ty}));a.download=n;document.body.appendChild(a);a.click();a.remove()}
+function cad(){dl('elingo-backup-'+today()+'.json',JSON.stringify({app:'elingo',tanggal:today(),data:D}),'application/json');
+say('File backup sudah diunduh. Silakan buka Google Drive, upload file ini ke folder Elingo agar aman saat ganti HP. File ini berisi semua catatan kamu.')}
+function pul(ev){const f=ev.target.files[0];if(!f)return;const r=new FileReader();
+r.onload=()=>{try{let x=JSON.parse(r.result);x=x.data||x;if(!Array.isArray(x.j)||!Array.isArray(x.u)||!Array.isArray(x.p))throw 0;
+D=x;D.s=Object.assign(defS(),D.s||{});save();tema();render();say(`Data berhasil dipulihkan. Total ${D.j.length} jurnal, ${D.u.length} transaksi uang, ${D.p.length} pengalaman.`)}catch(_){say('File backup tidak bisa dibaca. Pilih file yang benar.')}ev.target.value=''};r.readAsText(f)}
+function exTxt(){let s='ELINGO - SEMUA CATATAN\n\nJURNAL\n';
+D.j.forEach(x=>s+=`${x.t} | ${x.m} | ${x.j}\n${x.i}\nTag: ${x.g.join(', ')}\n\n`);s+='UANG\n';
+D.u.forEach(x=>s+=`${x.t} | ${x.k} | ${x.n} | ${x.c} | ${x.d}\n`);s+='\nPENGALAMAN\n';
+D.p.forEach(x=>s+=`${x.t} | ${x.j} | Siapa: ${x.s} | Dimana: ${x.d}\n${x.a}\nPelajaran: ${x.l}\nNilai: ${x.n}\n\n`);
+dl('elingo-catatan-'+today()+'.txt',s,'text/plain');say('File teks sudah diunduh.')}
+function sPin(){const p=$('np').value;if(!/^\d{4}$/.test(p))return say('PIN harus 4 angka.');D.s.pin=p;save();$('np').value='';say('PIN aktif. Aplikasi akan minta PIN saat dibuka.')}
+function hPin(){D.s.pin='';save();say('PIN dimatikan.')}
+function sTg(){D.s.target=+$('tt').value||0;save();say('Target tabungan disimpan. '+tgt())}
+function hapus(){if(!confirm('Yakin hapus semua data?'))return;if(!confirm('Benar-benar yakin? Data tidak bisa kembali.'))return;
+try{localStorage.clear()}catch(_){}D={j:[],u:[],p:[],s:Object.assign(defS(),{tema:'gelap'})};tema();render();say('Semua data sudah dihapus.')}
+function lock(){if(D.s.pin){$('lock').hidden=false;$('app').hidden=true;say('Aplikasi terkunci. Masukkan PIN 4 angka.')}}
+function bukaPin(){if($('pin').value===D.s.pin){$('lock').hidden=true;$('app').hidden=false;$('pin').value='';show(0,1);say('PIN benar. '+sum(),cekNotif)}else say('PIN salah, coba lagi.')}
+function notif(t,b){say(t+'. '+b);try{if('Notification' in window&&Notification.permission=='granted')new Notification(t,{body:b})}catch(_){}}
+function aktifNotif(){if(!('Notification' in window))return say('HP ini belum mendukung notifikasi. Pengingat tetap dibacakan suara saat aplikasi dibuka.');Notification.requestPermission().then(p=>say(p=='granted'?'Notifikasi aktif.':'Notifikasi tidak diizinkan.'))}
+function cekNotif(){const m=[],t=tagih();if(t)m.push(t);const w=D.s.lastRing,d=w?(new Date(today()+'T00:00')-new Date(w+'T00:00'))/864e5:99;
+if(d>=7&&(D.j.length||D.u.length||D.p.length)){const x=tot();D.s.lastRing=today();save();m.push(`Catatan minggu lalu: ${D.j.filter(y=>inW(y.t)).length} jurnal, pengeluaran ${rp(x.w)}, ${D.p.filter(y=>inW(y.t)).length} pengalaman baru.`)}
+if(m.length)notif('Pengingat Elingo',m.join(' '))}
+function render(){rB();rJ();rU();rP()}
+function init(){
+$('nav').innerHTML=N.map((n,i)=>btn(n,'show('+i+')','Buka menu '+n)).join('');
+$('s0').innerHTML='<h2>BERANDA</h2><div id="bt" class="card"></div>'+btn('+ Tulis jurnal','show(1)','Tulis jurnal baru')+btn('+ Catat pengeluaran','show(2)','Catat pengeluaran baru')+btn('+ Catat pengalaman','show(3)','Catat pengalaman baru')
++fld('gq','Kolom pencarian',0)+btn('Cari','cari()','Cari di semua catatan')+btn('Cari dengan suara',"mic('gq','Pencarian',this,cari)",'Cari dengan suara')+btn('Buat ringkasan minggu ini','ring()')+'<div id="hasil"></div>';
+$('s1').innerHTML='<h2>JURNAL</h2><p>Tanggal: '+today()+'</p><p>Pilih mood:</p>'+MOODS.map(m=>`<button class="mb" data-m="${m}" aria-label="Pilih mood ${m}" onclick="setMood('${m}')">${m}</button>`).join('')
++fld('jj','Judul jurnal',1)+fld('ji','Isi jurnal',1,1)+btn('Simpan jurnal','sJ()')+'<p id="ms" class="card"></p>'+fld('jq','Cari jurnal',1)+'<div id="jl"></div>';
+$('s2').innerHTML='<h2>UANG</h2><p>Tanggal: '+today()+'</p>'+sel('uj','Jenis',['Pengeluaran','Pemasukan'])+'<label for="un">Nominal (angka saja)</label><input id="un" type="number" inputmode="numeric" aria-label="Nominal uang, angka saja">'+sel('uk','Kategori',KAT)+fld('ud','Keterangan uang',1)+btn('Simpan transaksi','sU()')
++'<div id="ut" class="card"></div><p id="tg" class="card"></p><h2>TAGIHAN</h2>'+fld('tn','Nama tagihan',0)+'<label for="td">Tanggal tiap bulan (1 sampai 31)</label><input id="td" type="number" inputmode="numeric" aria-label="Tanggal tagihan tiap bulan">'+btn('Simpan tagihan','sT()')+'<div id="tl"></div><h2>DAFTAR TRANSAKSI</h2>'+sel('uf','Filter kategori',['Semua',...KAT])+'<label for="um">Filter bulan</label><input id="um" type="month" aria-label="Filter bulan">'+'<div id="ul"></div>';
+$('s3').innerHTML='<h2>PENGALAMAN</h2>'+fld('pj','Judul pengalaman',1)+'<label for="pt">Tanggal</label><input id="pt" type="date" aria-label="Tanggal pengalaman">'+fld('ps','Siapa',0)+fld('pd','Dimana',0)+fld('pa','Apa yang terjadi',1,1)+fld('pl','Pelajaran yang didapat',1,1)+sel('pn','Nilai',['Sangat Bermanfaat','Biasa','Jangan Diulang'])+btn('Simpan pengalaman','sP()')
++fld('pq','Cari pengalaman',1)+sel('pf','Filter nilai',['Semua','Sangat Bermanfaat','Biasa','Jangan Diulang'])+'<div id="pls"></div>';
+$('s4').innerHTML='<h2>PENGATURAN</h2>'+btn('Ganti tema','ganti()','Ganti tema gelap atau terang')
++'<h2>PIN</h2><label for="np">PIN baru, 4 angka</label><input id="np" type="password" inputmode="numeric" maxlength="4" aria-label="PIN baru 4 angka">'+btn('Simpan PIN','sPin()')+btn('Matikan PIN','hPin()')
++'<h2>TARGET TABUNGAN</h2><label for="tt">Target bulanan, contoh 100000</label><input id="tt" type="number" inputmode="numeric" aria-label="Target tabungan bulanan">'+btn('Simpan target','sTg()')
++'<h2>NOTIFIKASI</h2>'+btn('Aktifkan notifikasi','aktifNotif()','Aktifkan notifikasi pengingat')+'<h2>BACKUP</h2><p class="card">Cara Backup: 1. Tekan Cadangkan. 2. File terunduh. 3. Buka aplikasi Google Drive. 4. Upload file itu. Cara Pulihkan: 1. Download file backup dari Drive. 2. Tekan Pulihkan. 3. Pilih file itu.</p>'
++btn('Cadangkan ke Drive','cad()')+btn('Pulihkan dari Drive',"$('rf').click()")+'<input id="rf" type="file" accept=".json,application/json" hidden aria-label="Pilih file backup" onchange="pul(event)">'+btn('Export ke TXT','exTxt()','Export semua catatan ke file teks')
++btn('Hapus semua data','hapus()')+'<h2>TENTANG</h2><p class="card">Elingo adalah catatan pribadi untuk jurnal, uang, dan pengalaman. Semua data tersimpan di HP ini, tanpa internet dan tanpa login.</p>';
+document.querySelector('main').addEventListener('input',()=>{rJ();rP()});
+document.querySelector('main').addEventListener('change',()=>{rU();rP()});
+tema();show(0,1);lock()}
+init();
+if(!D.s.pin){$('out').textContent='Selamat datang di Elingo. '+sum();cekNotif()}
+</script></body></html>
